@@ -27,7 +27,7 @@ public class JDBC{
     //strings, but that won't always be the case.
     static final String displayWritingGroupFormat="%-30s%-30s%-15s%-20s\n";
     static final String displayPublishersFormat="%-20s%-30s%-10s%-40s\n";
-    static final String displayBookFormat= "%-5s%-15s%-15s%-15s\n";
+    static final String displayBookFormat= "%-50s%-15s%-15s%-30s%-20s\n";
 // JDBC driver name and database URL
     static final String JDBC_DRIVER = "org.apache.derby.jdbc.ClientDriver";
     static String DB_URL = "jdbc:derby://localhost:1527/";
@@ -81,13 +81,13 @@ public class JDBC{
                 
                 try {
                     menuChoice = in.nextInt();
+                    in.nextLine();
                     if(menuChoice < 1 || menuChoice > 10) {
                         System.out.println("Invalid Input, Please choose one of the menu options");
                         in.nextLine();
                         continue;
                     }
                     if(menuChoice == 10) {
-                        System.out.println("Goodbye!");
                         run = false;
                         continue;
                     }
@@ -137,7 +137,7 @@ public class JDBC{
                         }
                         case 6 :    //View specific Book
                         {
-                            PreparedStatement listBook = conn.prepareStatement("SELECT * FROM book WHERE bookname = ?");
+                            PreparedStatement listBook = conn.prepareStatement("SELECT * FROM book WHERE booktitle = ?");
                             System.out.println("What Book would you like to view?");
                             sql = in.nextLine();
                             listBook.setString(1, sql);
@@ -147,7 +147,9 @@ public class JDBC{
                         }
                         case 7 :    //Insert Book
                         {
-                            PreparedStatement insertBook = conn.prepareStatement("INSERT INTO book VALUE(?, ?, ?, ?, ?)");
+                            PreparedStatement insertBook = conn.prepareStatement("INSERT INTO book" +
+                                    "(BookTitle,YearPublished,NumberPages,Group_name,Pub_Name) VALUES" +
+                                    "(?,?,?,?,?)");
                             System.out.println("Please enter the Book Title");
                             sql = in.nextLine();
                             insertBook.setString(1, sql);
@@ -163,35 +165,64 @@ public class JDBC{
                             System.out.println("Please enter the Publisher's Name");
                             sql = in.nextLine();
                             insertBook.setString(5, sql);
-                            insertBook.execute();
+                            insertBook.executeUpdate();
+                            
+                            //Display Books
+                            sql = "SELECT * FROM Book";
+                            rs = stmt.executeQuery(sql);
                             DisplayBook(rs);
                             break;
                         }
                         case 8 :    //Insert new Publisher + replace old publishers books
                         {
-                            //PreparedStatement insertPub = conn.prepareStatement("INSERT INTO publishers VALUE ")
+                            //Inserts new Publisher
+                            String newPubName;
+                            PreparedStatement insertPub = conn.prepareStatement("INSERT INTO publishers" +
+                                    "(PubName,PubAddr,PubPhone,PubEmail)VALUES" +
+                                    "(?,?,?,?)");
+                            System.out.println("Publisher Name");
+                            newPubName = in.nextLine();
+                            insertPub.setString(1, newPubName);
+                            System.out.println("Publisher Address");
+                            sql = in.nextLine();
+                            insertPub.setString(2, sql);
+                            System.out.println("Publisher Phone #");
+                            sql = in.nextLine();
+                            insertPub.setString(3, sql);
+                            System.out.println("Publisher E-mail");
+                            sql = in.nextLine();
+                            insertPub.setString(4, sql);
+                            insertPub.executeUpdate();
+                            
+                            //Changes all Books old Publishers, to the new Publisher
+                            PreparedStatement updatePub = conn.prepareStatement("UPDATE book SET pub_Name = ? WHERE pub_Name = ?");
+                            updatePub.setString(1, newPubName);
+                            System.out.println("Please enter the old Publisher Name");
+                            sql = in.nextLine();
+                            updatePub.setString(2, sql);
+                            updatePub.executeUpdate();
+                            
+                            //Display all Books
+                            sql = "SELECT * FROM book";
+                            rs = stmt.executeQuery(sql);
+                            DisplayBook(rs);
                             break;
                         }
                         case 9 :    //Remove specific Book
                         {
+                            PreparedStatement deleteBook = conn.prepareStatement("DELETE FROM Book WHERE BookTitle = ?");
+                            System.out.println("What Book would you like to remove?");
+                            sql = in.nextLine();
+                            deleteBook.setString(1, sql);
+                            deleteBook.executeUpdate();
+                            
+                            //Display all Books
+                            sql = "SELECT * FROM book";
+                            rs = stmt.executeQuery(sql);
+                            DisplayBook(rs);
                             break;
                         }
                     }
-
-                    //STEP 5: Extract data from result set
-                    System.out.printf(displayWritingGroupFormat, "Group Name", "Head Writer", "Year Formed", "Subject");
-                    while (rs.next()) {
-                        //Retrieve by column name
-                        String Publisher = rs.getString("GroupName");
-                        String Address = rs.getString("HeadWriter");
-                        String Phone = rs.getString("YearFormed");
-                        String Email = rs.getString("Subject");
-
-                        //Display values
-                        System.out.printf(displayWritingGroupFormat,
-                                dispNull(Publisher), dispNull(Address), dispNull(Phone), dispNull(Email));
-                    }
-                
                 }
                 catch(InputMismatchException e) {
                     System.out.println("Invalid Input, Please enter an Integer");
@@ -238,8 +269,71 @@ public class JDBC{
                            "6)  List all the data for a book specified by the user\n" +
                            "7)  Insert a new book\n" +
                            "8)  Insert a new publisher and update all book published by one publisher to be published by the new pubisher\n" +
-                           "9)  Remove a book specified by the user" +
+                           "9)  Remove a book specified by the user\n" +
                            "10) Quit");
+    }
+    
+    public static void DisplayGroup(ResultSet rs) {
+        //STEP 5: Extract data from result set
+        System.out.printf(displayWritingGroupFormat, "Group Name", "Head Writer", "Year Formed", "Subject");
+        try {
+            while (rs.next()) {
+                //Retrieve by column name
+                String GroupName = rs.getString("GroupName");
+                String HeadWriter = rs.getString("HeadWriter");
+                String YearFormed = rs.getString("YearFormed");
+                String Subject = rs.getString("Subject");
+                
+                //Display values
+                System.out.printf(displayWritingGroupFormat,
+                        dispNull(GroupName), dispNull(HeadWriter), dispNull(YearFormed), dispNull(Subject));
+            }
+        } catch (SQLException se) {
+            //Handle errors for JDBC
+            se.printStackTrace();
+        }
+    }
+    
+    public static void DisplayPub(ResultSet rs) {
+        //STEP 5: Extract data from result set
+        System.out.printf(displayPublishersFormat, "Publisher", "Address", "Phone #", "Email");
+        try {
+            while (rs.next()) {
+                //Retrieve by column name
+                String Publisher = rs.getString("PubName");
+                String Address = rs.getString("PubAddr");
+                String Phone = rs.getString("PubPhone");
+                String Email = rs.getString("PubEmail");
+                
+                //Display values
+                System.out.printf(displayPublishersFormat,
+                        dispNull(Publisher), dispNull(Address), dispNull(Phone), dispNull(Email));
+            }
+        } catch (SQLException se) {
+            //Handle errors for JDBC
+            se.printStackTrace();
+        }
+    }
+    public static void DisplayBook(ResultSet rs) {
+        //STEP 5: Extract data from result set
+        System.out.printf(displayBookFormat, "Book Title", "Year Published", "# Pages", "Writing Group", "Publisher");
+        try {
+            while (rs.next()) {
+                //Retrieve by column name
+                String Title = rs.getString("BookTitle");
+                String Year = rs.getString("YearPublished");
+                String Pages = rs.getString("NumberPages");
+                String WritingGroup = rs.getString("Group_Name");
+                String Publisher = rs.getString("Pub_Name");
+                
+                //Display values
+                System.out.printf(displayBookFormat,
+                        dispNull(Title), dispNull(Year), dispNull(Pages), dispNull(WritingGroup), dispNull(Publisher));
+            }
+        } catch (SQLException se) {
+            //Handle errors for JDBC
+            se.printStackTrace();
+        }
     }
 }//end FirstExample}
 
